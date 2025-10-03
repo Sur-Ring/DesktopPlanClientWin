@@ -27,18 +27,18 @@ Todo_Tab::Todo_Tab(QWidget *parent) :
 
 Todo_Tab::Todo_Tab(const QJsonObject& tab_data, QWidget *parent) : Todo_Tab(parent){
     // 解析标题
-    if (!tab_data["TabName"].isString()) {
+    if (!tab_data["name"].isString()) {
         qDebug() << "tab name decode error";
         return;
     }
-    ui->tab_name->setText(tab_data["TabName"].toString());
+    ui->tab_name->setText(tab_data["name"].toString());
 
     // 解析条目
-    if (!tab_data["Entries"].isArray()) {
+    if (!tab_data["todo_entry_list"].isArray()) {
         qDebug() << "tab entries decode error";
         return;
     }
-    QJsonArray entry_array = tab_data["Entries"].toArray();
+    QJsonArray entry_array = tab_data["todo_entry_list"].toArray();
     for (int i = 0; i < entry_array.size(); i++) {
         if (!entry_array[i].isObject()) {
             qDebug() << "entry decode error";
@@ -65,13 +65,13 @@ Todo_Tab::~Todo_Tab() {
 
 QJsonObject Todo_Tab::get_json() {
     QJsonObject tab_data;
-    tab_data["TabName"] = ui->tab_name->text();
+    tab_data["name"] = ui->tab_name->text();
     QJsonArray entry_array;
     for (int i = 0; i < ui->entry_layout->count(); i++){
         Todo_Entry* entry = dynamic_cast<Todo_Entry*>(ui->entry_layout->itemAt(i)->widget());
         entry_array.append(entry->get_json());
     }
-    tab_data["Entries"] = entry_array;
+    tab_data["todo_entry_list"] = entry_array;
     tab_data["Fold"] = is_fold;
 
     return tab_data;
@@ -81,8 +81,8 @@ void Todo_Tab::on_add_btn_clicked() {
     qDebug() << "Todo_Tab::on_add_btn_clicked";
 
     QJsonObject entry_data;
-    entry_data.insert("Desc", "新条目");
-    entry_data.insert("DDL", QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm"));
+    entry_data.insert("name", "新条目");
+    entry_data.insert("ddl", QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm"));
     create_entry(entry_data);
 
     need_save();

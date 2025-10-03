@@ -11,6 +11,7 @@
 #include <QJsonParseError>
 #include <QFile>
 #include <QFileInfo>
+#include <QNetworkDatagram>
 
 #include <Psapi.h>
 #include <windowsx.h>
@@ -52,13 +53,10 @@ MainWindow::MainWindow(QWidget *parent)
         ui->lock_btn->setIcon(QIcon::fromTheme("media-optical"));
     }
 
-    // 同步相关
-    pwd = config->value("/SN/PWD", "默认密码").toString();
-    last_sync = config->value("/SN/LastSync", "2025-10-01 00:00:00").toDateTime();
-    last_edit = config->value("/SN/LastEdit", "2025-10-01 00:00:00").toDateTime();
-
     // 加载数据
+    data_mgr = new DataMgr(data_file_path, config);
     load_data();
+
     inited = true;
 }
 
@@ -66,18 +64,17 @@ MainWindow::~MainWindow(){
     save_data();
     config->setValue("/SN/Locked", locked);
     config->setValue("/SN/Geometry", saveGeometry());
-    config->setValue("/SN/LastSync", last_sync);
-    config->setValue("/SN/LastEdit", last_edit);
+    delete data_mgr;
+    delete monitor;
     delete config;
     delete ui;
-    delete monitor;
     qDebug() << "StickyNote exit";
 }
 
 // 工具栏相关
 #pragma region 工具栏相关
 void MainWindow::on_sync_btn_clicked() {
-    sync_data();
+    data_mgr->save_data(get_json());
 }
 
 void MainWindow::on_lock_btn_clicked() {
@@ -100,45 +97,26 @@ void MainWindow::on_exit_btn_clicked() {
 }
 #pragma endregion 工具栏相关
 
-// 同步相关
-#pragma region 同步相关
-void MainWindow::sync_data() {
-
-
-}
-#pragma endregion 同步相关
-
 // 数据相关
 #pragma region 数据相关
+QJsonObject MainWindow::get_json() {
+    QJsonObject todo_data;
+
+    QJsonArray tab_array;
+    for (int i = 0; i < ui->tab_layout->count(); i++){
+        Todo_Tab* tab = dynamic_cast<Todo_Tab*>(ui->tab_layout->itemAt(i)->widget());
+        tab_array.append(tab->get_json());
+    }
+    todo_data["todo_tab_list"] = tab_array;
+
+    return todo_data;
+}
+
 void MainWindow::load_data() {
     qDebug() << "MainWindow load_data";
+    QJsonObject todo_data = data_mgr->load_data();
 
-    // 读取数据文件
-    QFileInfo fileInfo(data_file_path);
-    qDebug() << "File Path: " << fileInfo.absoluteFilePath();
-
-    QFile file(data_file_path);
-    if (!file.open(QFile::ReadOnly | QFile::Text)) {
-        qDebug() << "can't open data file!";
-        return;
-    }
-    QTextStream stream(&file);
-    QString str = stream.readAll();
-    qDebug() << "str: " << str;
-    file.close();
-
-    // 解析json
-    QJsonParseError jsonError;
-    QJsonDocument doc = QJsonDocument::fromJson(str.toUtf8(), &jsonError);
-    if (jsonError.error != QJsonParseError::NoError && !doc.isNull()) {
-        qDebug() << "Json error！" << jsonError.error;
-        return;
-    }
-    if (!doc.isArray()) {
-        qDebug() << "data decode error";
-        return;
-    }
-    QJsonArray tab_array = doc.array();
+    QJsonArray tab_array = todo_data["todo_tab_list"].toArray();
     for (int i = 0; i < tab_array.size(); i++) {
         QJsonValue tab = tab_array.at(i);
         if (!tab.isObject()) {
@@ -151,27 +129,8 @@ void MainWindow::load_data() {
 }
 
 void MainWindow::save_data() {
-    qDebug() << "TimerWidget save_data";
-
-    QJsonArray tab_array;
-    for (int i = 0; i < ui->tab_layout->count(); i++){
-        Todo_Tab* tab = dynamic_cast<Todo_Tab*>(ui->tab_layout->itemAt(i)->widget());
-        tab_array.append(tab->get_json());
-    }
-
-    QJsonDocument doc;
-    doc.setArray(tab_array);
-
-    QFile file(data_file_path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        qDebug() << "can't open error!";
-        return;
-    }
-    QTextStream stream(&file);
-    stream << doc.toJson();
-    file.close();
-
-    sync_data();
+    qDebug() << "MainWindow save_data";
+    data_mgr->save_data(get_json());
 }
 #pragma endregion 数据相关
 
@@ -181,8 +140,8 @@ void MainWindow::add_tab() {
     qDebug() << "MainWindow add_tab";
 
     QJsonObject tab_data;
-    tab_data.insert("TabName", "新项目");
-    tab_data.insert("Entries", QJsonArray());
+    tab_data.insert("name", "新项目");
+    tab_data.insert("todo_entry_list", QJsonArray());
     tab_data.insert("Fold", false);
     create_tab(tab_data);
 }
@@ -254,7 +213,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
     if (locked) return;
     // 当鼠标左键被按下时移动窗口
     if (event->buttons() & Qt::LeftButton) {
-        move(event->globalPos() - m_dragPosition);
+        move(event->globalPosition().toPoint() - m_dragPosition);
         event->accept();
     }
 }

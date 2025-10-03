@@ -5,10 +5,12 @@
 
 #include <QSettings>
 #include <QDateTime>
+#include <QUdpSocket>
 
 #include <windows.h>
 #include "Monitor.h"
 #include "todo_tab.h"
+#include "DataMgr.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -29,6 +31,7 @@ private:
 
     HWND hWnd;
     Monitor* monitor;
+    DataMgr* data_mgr;
 
     QSettings* config;
 
@@ -46,14 +49,9 @@ protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
     void paintEvent(QPaintEvent*event) override;
 
-    // 同步相关
-    QString pwd;
-    QDateTime last_sync;
-    QDateTime last_edit;
-    void sync_data();
-
     // 数据相关
 public:
+    QJsonObject get_json();
     void load_data();
 public slots:
     void save_data();

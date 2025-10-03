@@ -29,18 +29,18 @@ Todo_Entry::Todo_Entry(QWidget *parent) :
 
 Todo_Entry::Todo_Entry(const QJsonObject &entry_data, QWidget *parent) : Todo_Entry(parent){
     // 解析描述
-    if (!entry_data["Desc"].isString()) {
+    if (!entry_data["name"].isString()) {
         qDebug() << "entry desc decode error";
         return;
     }
-    ui->desc->setPlainText(entry_data["Desc"].toString());
+    ui->desc->setPlainText(entry_data["name"].toString());
 
     // 解析DDL
-    if (!entry_data["DDL"].isString()) {
+    if (!entry_data["ddl"].isString()) {
         qDebug() << "entry desc decode error";
         return;
     }
-    ui->ddl->setText(entry_data["DDL"].toString());
+    ui->ddl->setText(entry_data["ddl"].toString());
 }
 
 Todo_Entry::~Todo_Entry() {
@@ -49,8 +49,8 @@ Todo_Entry::~Todo_Entry() {
 
 QJsonObject Todo_Entry::get_json() {
     QJsonObject entry_data;
-    entry_data["Desc"] = ui->desc->toPlainText();
-    entry_data["DDL"] = ui->ddl->text();
+    entry_data["name"] = ui->desc->toPlainText();
+    entry_data["ddl"] = ui->ddl->text();
     return entry_data;
 }
 
