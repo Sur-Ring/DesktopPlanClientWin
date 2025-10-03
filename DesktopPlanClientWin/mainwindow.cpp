@@ -28,23 +28,32 @@ MainWindow::MainWindow(QWidget *parent)
     hWnd = (HWND)winId();
 
     config = new QSettings("./Data/cfg.ini", QSettings::IniFormat);
-    locked = config->value("/SN/Locked", false).toBool();
-    int topmost_time = config->value("/SN/TopMost", 50).toUInt();
+
+    // 窗口样式相关
     restoreGeometry(config->value("/SN/Geometry","300,300,300,300").toByteArray());
+    int topmost_time = config->value("/SN/TopMost", 50).toUInt();
+    set_window_style();
+    monitor = new Monitor(hWnd, topmost_time);
+
+    // 主窗口相关
     int font_size = config->value("/SN/FontSize", 14).toUInt();
     config->setValue("/SN/FontSize", font_size);
     ft.setPointSize(font_size);
 
-    // 窗口样式相关
-    set_window_style();
-    monitor = new Monitor(hWnd, topmost_time);
-
     // 工具栏相关
     synced = false;
     saved = true;
+    locked = config->value("/SN/Locked", false).toBool();
+    if (locked) {
+        ui->lock_btn->setText("Lock");
+        ui->lock_btn->setIcon(QIcon::fromTheme("media-record"));
+    }else {
+        ui->lock_btn->setText("No Lock");
+        ui->lock_btn->setIcon(QIcon::fromTheme("media-optical"));
+    }
 
+    // 加载数据
     load_data();
-
     inited = true;
 }
 
@@ -61,27 +70,8 @@ MainWindow::~MainWindow()
 
 // 工具栏相关
 #pragma region 工具栏相关
-void MainWindow::has_saved() {
-    saved = true;
-    ui->save_btn->setText("Saved");
-    ui->save_btn->setIcon(QIcon::fromTheme("document-save"));
-}
-
-void MainWindow::has_changed() {
-    saved = false;
-    ui->save_btn->setText("Edited");
-    ui->save_btn->setIcon(QIcon::fromTheme("mail-message-new"));
-}
-
 void MainWindow::on_sync_btn_clicked() {
-}
-
-void MainWindow::on_save_btn_clicked() {
-    // if (!saved) {
-    //     // 按到这个按钮本身就会导致失去焦点发生保存, 所以什么都不用做
-    //     force_save();
-    // }
-    // force_save();
+    // TODO
 }
 
 void MainWindow::on_lock_btn_clicked() {
@@ -96,7 +86,7 @@ void MainWindow::on_lock_btn_clicked() {
 }
 
 void MainWindow::on_add_btn_clicked() {
-    // add_tab();
+    add_tab();
 }
 
 void MainWindow::on_exit_btn_clicked() {

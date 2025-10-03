@@ -68,10 +68,7 @@ private:
     bool saved;
     bool locked;
 public slots:
-    void has_changed();
-    void has_saved();
     void on_sync_btn_clicked();
-    void on_save_btn_clicked();
     void on_lock_btn_clicked();
     void on_add_btn_clicked();
     void on_exit_btn_clicked();
