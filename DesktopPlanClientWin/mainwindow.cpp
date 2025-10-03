@@ -52,16 +52,22 @@ MainWindow::MainWindow(QWidget *parent)
         ui->lock_btn->setIcon(QIcon::fromTheme("media-optical"));
     }
 
+    // 同步相关
+    pwd = config->value("/SN/PWD", "默认密码").toString();
+    last_sync = config->value("/SN/LastSync", "2025-10-01 00:00:00").toDateTime();
+    last_edit = config->value("/SN/LastEdit", "2025-10-01 00:00:00").toDateTime();
+
     // 加载数据
     load_data();
     inited = true;
 }
 
-MainWindow::~MainWindow()
-{
+MainWindow::~MainWindow(){
     save_data();
     config->setValue("/SN/Locked", locked);
     config->setValue("/SN/Geometry", saveGeometry());
+    config->setValue("/SN/LastSync", last_sync);
+    config->setValue("/SN/LastEdit", last_edit);
     delete config;
     delete ui;
     delete monitor;
@@ -71,7 +77,7 @@ MainWindow::~MainWindow()
 // 工具栏相关
 #pragma region 工具栏相关
 void MainWindow::on_sync_btn_clicked() {
-    // TODO
+    sync_data();
 }
 
 void MainWindow::on_lock_btn_clicked() {
@@ -96,6 +102,10 @@ void MainWindow::on_exit_btn_clicked() {
 
 // 同步相关
 #pragma region 同步相关
+void MainWindow::sync_data() {
+
+
+}
 #pragma endregion 同步相关
 
 // 数据相关
@@ -160,6 +170,8 @@ void MainWindow::save_data() {
     QTextStream stream(&file);
     stream << doc.toJson();
     file.close();
+
+    sync_data();
 }
 #pragma endregion 数据相关
 

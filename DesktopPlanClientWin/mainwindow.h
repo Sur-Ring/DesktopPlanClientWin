@@ -4,6 +4,7 @@
 #include <QMainWindow>
 
 #include <QSettings>
+#include <QDateTime>
 
 #include <windows.h>
 #include "Monitor.h"
@@ -46,6 +47,10 @@ protected:
     void paintEvent(QPaintEvent*event) override;
 
     // 同步相关
+    QString pwd;
+    QDateTime last_sync;
+    QDateTime last_edit;
+    void sync_data();
 
     // 数据相关
 public:
