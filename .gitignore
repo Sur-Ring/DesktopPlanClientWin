@@ -52,3 +52,9 @@ compile_commands.json
 *creator.user*
 
 *_qmlcache.qrc
+
+# seld edited
+/.idea/
+/cmake-build-debug/
+/DesktopPlanClientWin/build
+/DesktopPlanClientWin/cmake-build-debug
