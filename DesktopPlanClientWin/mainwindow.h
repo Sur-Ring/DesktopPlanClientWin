@@ -51,7 +51,7 @@ protected:
 
     // 数据相关
 public:
-    QJsonObject get_json();
+    QJsonArray get_json();
     void load_data();
 public slots:
     void save_data();

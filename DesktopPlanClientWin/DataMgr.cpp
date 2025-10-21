@@ -22,36 +22,36 @@ DataMgr::DataMgr(QString data_file_path, QSettings* config){
     this->data_file_path = data_file_path;
 
     pwd = config->value("/SN/PWD", "默认密码").toString();
-    last_sync = config->value("/SN/LastSync", "2025-10-01 00:00:00").toDateTime();
-    last_edit = config->value("/SN/LastEdit", "2025-10-01 00:00:00").toDateTime();
     hello_socket = new QUdpSocket(this);
     hello_port = config->value("/SN/HelloPort", 5051).toInt();
     connect(hello_socket, &QUdpSocket::readyRead, this, &DataMgr::server_hello_response);
-    if (last_edit>last_sync) {
-        need_sync = true;
-    }else {
-        need_sync = false;
-    }
     discover_server();
     manager = new QNetworkAccessManager(this);
     connect(manager, &QNetworkAccessManager::finished, this, &DataMgr::on_server_reply);
+
+    load_data();
+    if (last_sync != last_edit) {
+        sync_data();
+    }
 }
 
 DataMgr::~DataMgr() {
-    config->setValue("/SN/LastSync", last_sync);
-    config->setValue("/SN/LastEdit", last_edit);
 }
 
 // 本地存储相关
 #pragma region 本地存储相关
-QJsonObject DataMgr::load_data() {
+QJsonArray DataMgr::get_tab_list() {
+    return last_tab_list;
+}
+
+void DataMgr::load_data() {
     qDebug() << "DataMgr load_data";
 
     // 读取数据文件
     QFile file(data_file_path);
     if (!file.open(QFile::ReadOnly | QFile::Text)) {
         qDebug() << "can't open data file!";
-        return {};
+        return;
     }
     QTextStream stream(&file);
     QString str = stream.readAll();
@@ -63,22 +63,38 @@ QJsonObject DataMgr::load_data() {
     QJsonDocument doc = QJsonDocument::fromJson(str.toUtf8(), &jsonError);
     if (jsonError.error != QJsonParseError::NoError && !doc.isNull()) {
         qDebug() << "Json error！" << jsonError.error;
-        return {};
+        return ;
     }
     if (!doc.isObject()) {
         qDebug() << "data decode error";
-        return {};
+        return ;
     }
+    QJsonObject todo_data = doc.object();
 
-    return doc.object();
+    last_sync = QDateTime::fromString(todo_data["sync_time"].toString(), "yyyy-MM-dd hh:mm:ss");
+    last_edit = QDateTime::fromString(todo_data["edit_time"].toString(), "yyyy-MM-dd hh:mm:ss");
+    last_tab_list = todo_data["tab_list"].toArray();
 }
 
-void DataMgr::save_data(QJsonObject todo_data) {
+void DataMgr::update_tab_list(QJsonArray new_tab_list) {
+    last_tab_list = new_tab_list;
+    last_edit = QDateTime::currentDateTime();
+    save_data();
+}
+
+void DataMgr::save_data() {
     qDebug() << "DataMgr save_data";
+
+    // 处理json
+    QJsonObject todo_data;
+    todo_data.insert("sync_time", last_sync.toString("yyyy-MM-dd hh:mm:ss"));
+    todo_data.insert("edit_time", last_edit.toString("yyyy-MM-dd hh:mm:ss"));
+    todo_data.insert("tab_list", last_tab_list);
 
     QJsonDocument doc;
     doc.setObject(todo_data);
 
+    // 写入文件
     QFile file(data_file_path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         qDebug() << "can't open error!";
@@ -88,14 +104,16 @@ void DataMgr::save_data(QJsonObject todo_data) {
     stream << doc.toJson();
     file.close();
 
-    last_edit = QDateTime::currentDateTime();
-    sync_data(todo_data);
+    // 同步
+    if (last_sync != last_edit) {
+        sync_data();
+    }
 }
 #pragma endregion 本地存储相关
 
 // 同步相关
 #pragma region 同步相关
-void DataMgr::sync_data(QJsonObject todo_data) {
+void DataMgr::sync_data() {
     qDebug() << "DataMgr sync_data";
     if (server_ip == "") {
         discover_server();
@@ -104,16 +122,16 @@ void DataMgr::sync_data(QJsonObject todo_data) {
 
     QJsonObject doc_data;
 
+    qDebug() << "sync_time send:" <<  last_sync.toString();
     doc_data["sync_time"] = last_sync.toString("yyyy-MM-dd hh:mm:ss");
-    doc_data["edit_time"] = last_edit.toString("yyyy-MM-dd hh:mm:ss");
-    doc_data["todo_data"] = todo_data;
+    doc_data["tab_list"] = last_tab_list;
 
     // 将QJsonObject转换为QByteArray
     QJsonDocument doc(doc_data);
     QByteArray jsonData = doc.toJson();
 
     // 设置请求URL
-    QUrl url("http://"+server_ip+":"+QString::number(server_port)+"/api/data/check");
+    QUrl url("http://"+server_ip+":"+QString::number(server_port)+"/api/data/push");
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
@@ -129,26 +147,25 @@ void DataMgr::on_server_reply(QNetworkReply *reply) {
         QJsonObject jsonObject = jsonResponse.object();
 
         // 处理响应数据
-        int sync_stat = jsonObject["sync_stat"].toInt();
-        qDebug() << "Response:" << jsonObject << "stat:" << sync_stat;
-        if (sync_stat == 1) {
+        int result = jsonObject["result"].toInt();
+        qDebug() << "Response:" << jsonObject << "result:" << result;
+        if (result == -1) {
+            qDebug() << "sync fail";
+            // 如果同步失败, 那么直接将服务器的数据作为自己的数据
             last_sync = QDateTime::fromString(jsonObject["sync_time"].toString(),"yyyy-MM-dd hh:mm:ss");
+            last_edit = last_sync;
+            last_tab_list = jsonObject["tab_list"].toArray();
+            qDebug() << "new sync time" << last_sync.toString();
+            save_data();
+            emit sync_complete();
+            // 应该接下来再推送一次细分的更改, 如果后面用数据库的话
         }
-        else if (sync_stat == 2) {
+        else if (result == 0) {
+            qDebug() << "sync success";
+            // 同步成功, 更新同步时间
             last_sync = QDateTime::fromString(jsonObject["sync_time"].toString(),"yyyy-MM-dd hh:mm:ss");
-            save_data(jsonObject["server_data"].toObject());
-        }
-        else if (sync_stat == 3) {
-            QMessageBox::StandardButton choose;
-            choose = QMessageBox::question(NULL, "修改冲突", "以服务端为准？", QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
-            if (choose == QMessageBox::Yes) {
-                // 用户点击了Yes
-                save_data(jsonObject["server_data"].toObject());
-                last_sync = QDateTime::fromString(jsonObject["sync_time"].toString(),"yyyy-MM-dd hh:mm:ss");
-            } else {
-                // 用户点击了No
-                last_sync = QDateTime::fromString(jsonObject["sync_time"].toString(),"yyyy-MM-dd hh:mm:ss");
-            }
+            last_edit = last_sync;
+            save_data();
         }
     } else {
         // 处理错误

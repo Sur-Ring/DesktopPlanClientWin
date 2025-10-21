@@ -49,8 +49,7 @@ Todo_Tab::Todo_Tab(const QJsonObject& tab_data, QWidget *parent) : Todo_Tab(pare
     }
 
     if (!tab_data["Fold"].isBool()) {
-        qDebug() << "tab name decode error";
-        is_fold=false;
+        is_fold=true;
     }else {
         is_fold = tab_data["Fold"].toBool();
     }

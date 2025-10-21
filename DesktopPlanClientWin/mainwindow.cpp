@@ -56,6 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
     // 加载数据
     data_mgr = new DataMgr(data_file_path, config);
     load_data();
+    connect(data_mgr, &DataMgr::sync_complete, this, &MainWindow::load_data);
 
     inited = true;
 }
@@ -74,7 +75,7 @@ MainWindow::~MainWindow(){
 // 工具栏相关
 #pragma region 工具栏相关
 void MainWindow::on_sync_btn_clicked() {
-    data_mgr->save_data(get_json());
+    data_mgr->update_tab_list(get_json());
 }
 
 void MainWindow::on_lock_btn_clicked() {
@@ -99,26 +100,35 @@ void MainWindow::on_exit_btn_clicked() {
 
 // 数据相关
 #pragma region 数据相关
-QJsonObject MainWindow::get_json() {
-    QJsonObject todo_data;
-
+QJsonArray MainWindow::get_json() {
     QJsonArray tab_array;
     for (int i = 0; i < ui->tab_layout->count(); i++){
         Todo_Tab* tab = dynamic_cast<Todo_Tab*>(ui->tab_layout->itemAt(i)->widget());
         tab_array.append(tab->get_json());
     }
-    todo_data["todo_tab_list"] = tab_array;
-
-    return todo_data;
+    return tab_array;
 }
 
 void MainWindow::load_data() {
     qDebug() << "MainWindow load_data";
-    QJsonObject todo_data = data_mgr->load_data();
+    QJsonArray tab_list = data_mgr->get_tab_list();
 
-    QJsonArray tab_array = todo_data["todo_tab_list"].toArray();
-    for (int i = 0; i < tab_array.size(); i++) {
-        QJsonValue tab = tab_array.at(i);
+    QLayoutItem *child;
+    //每次使用takeAt取了之后，原有的count就会减少，所以每次取下标为0的即可
+    while ((child = ui->tab_layout->takeAt(0)) != NULL) {
+        if (child->widget()){
+            child->widget()->setParent(NULL);
+            delete child->widget();
+        }
+        else if (child->layout()) {
+            ui->tab_layout->removeItem(child->layout());
+        }
+        delete child;
+        child = NULL;
+    }
+
+    for (int i = 0; i < tab_list.size(); i++) {
+        QJsonValue tab = tab_list.at(i);
         if (!tab.isObject()) {
             qDebug() << "tab decode error";
             return;
@@ -130,7 +140,7 @@ void MainWindow::load_data() {
 
 void MainWindow::save_data() {
     qDebug() << "MainWindow save_data";
-    data_mgr->save_data(get_json());
+    data_mgr->update_tab_list(get_json());
 }
 #pragma endregion 数据相关
 
