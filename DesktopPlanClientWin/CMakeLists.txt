@@ -30,6 +30,10 @@ set(PROJECT_SOURCES
         DDL_Parser.h
         DataMgr.cpp
         DataMgr.h
+        SyncMgr.cpp
+        SyncMgr.h
+        ServerFinder.cpp
+        ServerFinder.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)

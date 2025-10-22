@@ -56,7 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
     // 加载数据
     data_mgr = new DataMgr(data_file_path, config);
     load_data();
-    connect(data_mgr, &DataMgr::sync_complete, this, &MainWindow::load_data);
+    connect(data_mgr, &DataMgr::tab_list_changed, this, &MainWindow::load_data);
 
     inited = true;
 }
