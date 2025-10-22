@@ -40,15 +40,21 @@ void SyncMgr::server_found(QString server_ip, int server_port) {
 }
 
 void SyncMgr::on_receive_response(QNetworkReply *reply) {
-    QString msg = reply->readAll();
-    qDebug() << "SyncMgr on_receive_response: " << msg;
+    while (reply->canReadLine()) {
+        QByteArray line = reply->readLine();
 
-    if (last_sync.toString("yyyy-MM-dd hh:mm:ss") != msg) {
-        // 需要拉取
-        get_data();
-    }else if (data_mgr->get_edit_time() > last_sync) {
-        // 需要推送
-        put_data();
+        if (line.startsWith("data: ")) {
+            QString msg = line.mid(6).trimmed();
+            qDebug() << "SyncMgr on_receive_response: " << msg;
+
+            if (last_sync.toString("yyyy-MM-dd hh:mm:ss") != msg) {
+                // 需要拉取
+                get_data();
+            }else if (data_mgr->get_edit_time() > last_sync) {
+                // 需要推送
+                put_data();
+            }
+        }
     }
 }
 
